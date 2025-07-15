@@ -5,76 +5,45 @@
   <title>Spotify'dan JSON Aktar</title>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
   <style>
-    body {
-      font-family: sans-serif;
-      padding: 2em;
-      background: #f3f3f3;
-    }
-    .btn {
-      padding: 10px 20px;
-      background: #1DB954;
-      color: white;
-      border: none;
-      cursor: pointer;
-      font-size: 16px;
-      border-radius: 5px;
-    }
-    .btn:hover {
-      background: #14833b;
-    }
-    .box {
-      background: white;
-      padding: 2em;
-      border-radius: 10px;
-      max-width: 700px;
-      margin: auto;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    }
-    pre {
-      background: #eee;
-      padding: 1em;
-      border-radius: 8px;
-      max-height: 300px;
-      overflow-y: auto;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-    }
+    body { font-family: sans-serif; padding: 2em; background: #f3f3f3; }
+    .btn { padding: 10px 20px; background: #1DB954; color: white; border: none; cursor: pointer; font-size: 16px; }
+    .btn:hover { background: #14833b; }
+    .box { background: white; padding: 2em; border-radius: 10px; max-width: 600px; margin: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    pre { background: #eee; padding: 1em; border-radius: 8px; max-height: 300px; overflow-y: auto; }
   </style>
 </head>
 <body>
   <div class="box">
-    <h2>🎵 Spotify'dan JSON Formatında Veri Aktar</h2>
-    <button class="btn" onclick="authorizeSpotify()">🔑 Spotify’a Giriş Yap</button>
-    <div id="status" style="margin: 1em 0;"></div>
+    <h2>🎵 Spotify'dan JSON Olarak Şarkı Verisi Aktar</h2>
+    <button class="btn" onclick="authorizeSpotify()">Spotify’a Giriş Yap</button>
+    <div id="status"></div>
     <pre id="output"></pre>
-    <button class="btn" id="download" style="display:none;" onclick="downloadJSON()">⬇️ JSON İndir</button>
+    <button class="btn" id="download" style="display:none;" onclick="downloadJSON()">JSON İndir</button>
   </div>
 
   <script>
-    const client_id = 'a7de2da91b9e4003b5415b2c9fb0715a'; // ← kendi client ID'in
-    const redirect_uri = 'https://yigittaybakan.github.io/spotify-exporter/'; // GitHub Pages adresin
+    const client_id = 'a7de2da91b9e4003b5415b2c9fb0715a'; // Senin Spotify Client ID
+    const redirect_uri = 'https://bahawaha.github.io/spotify-exporter/'; // Güncel GitHub Pages URL'n
 
-    // 1. Spotify'a giriş ve token alma
     function authorizeSpotify() {
       const scope = 'user-library-read playlist-read-private';
       const authURL = `https://accounts.spotify.com/authorize?client_id=${client_id}&response_type=token&redirect_uri=${encodeURIComponent(redirect_uri)}&scope=${encodeURIComponent(scope)}`;
       window.location.href = authURL;
     }
 
-    // 2. Token ile verileri çek
     async function fetchSpotifyData(token) {
+      document.getElementById("status").innerText = '⏳ Veri alınıyor...';
+
       const headers = { Authorization: `Bearer ${token}` };
       const allPlaylists = [];
-      document.getElementById("status").innerText = '⏳ Çalma listeleri getiriliyor...';
 
-      // Tüm çalma listeleri
+      // Çalma listelerini al
       let playlistsURL = 'https://api.spotify.com/v1/me/playlists?limit=50';
       while (playlistsURL) {
         const res = await axios.get(playlistsURL, { headers });
         for (const pl of res.data.items) {
           const tracks = [];
           let tracksURL = pl.tracks.href;
-          // Liste içindeki tüm şarkılar
           while (tracksURL) {
             const tRes = await axios.get(tracksURL, { headers });
             for (const t of tRes.data.items) {
@@ -87,13 +56,16 @@
             }
             tracksURL = tRes.data.next;
           }
-          allPlaylists.push({ playlist: pl.name, tracks });
+
+          allPlaylists.push({
+            playlist: pl.name,
+            tracks: tracks
+          });
         }
         playlistsURL = res.data.next;
       }
 
       // Beğenilen şarkılar
-      document.getElementById("status").innerText = '⏳ Beğenilen şarkılar getiriliyor...';
       const likedTracks = [];
       let likedURL = 'https://api.spotify.com/v1/me/tracks?limit=50';
       while (likedURL) {
@@ -109,7 +81,6 @@
         likedURL = res.data.next;
       }
 
-      // Final veri
       const exportData = [
         { playlist: "❤️ Beğenilen Şarkılar", tracks: likedTracks },
         ...allPlaylists
@@ -117,11 +88,10 @@
 
       document.getElementById("output").textContent = JSON.stringify(exportData, null, 2);
       document.getElementById("download").style.display = 'inline-block';
-      document.getElementById("status").innerText = `✅ ${allPlaylists.length} liste ve ${likedTracks.length} beğeni aktarıldı.`;
+      document.getElementById("status").innerText = '✅ Veriler alındı!';
       window.exportData = exportData;
     }
 
-    // 3. JSON olarak indirme
     function downloadJSON() {
       const data = new Blob([JSON.stringify(window.exportData, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(data);
@@ -131,7 +101,6 @@
       a.click();
     }
 
-    // 4. Sayfa yüklendiğinde token varsa otomatik veri çek
     window.addEventListener('load', () => {
       if (window.location.hash.includes('access_token')) {
         const hash = window.location.hash.substring(1);
