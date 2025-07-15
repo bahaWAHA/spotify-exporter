@@ -31,17 +31,21 @@
     function authorizeSpotify() {
       const scope = 'user-library-read playlist-read-private';
       const authURL = `https://accounts.spotify.com/authorize?client_id=${client_id}&response_type=token&redirect_uri=${encodeURIComponent(redirect_uri)}&scope=${encodeURIComponent(scope)}`;
+      console.log('Yetkilendirme URL:', authURL);
       window.location.href = authURL;
     }
 
     async function fetchWithRetry(url, headers, retries = 3, delay = 1000) {
       for (let i = 0; i < retries; i++) {
         try {
+          console.log(`API isteği: ${url}`);
           const response = await axios.get(url, { headers });
           return response;
         } catch (error) {
+          console.error(`Hata (${url}):`, error);
           if (error.response && error.response.status === 429 && i < retries - 1) {
             const retryAfter = error.response.headers['retry-after'] || delay;
+            console.log(`Rate limit, ${retryAfter}s bekleniyor...`);
             await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
             continue;
           }
@@ -52,6 +56,7 @@
 
     async function fetchSpotifyData(token) {
       try {
+        console.log('Token alındı:', token);
         document.getElementById("status").innerHTML = '⏳ Veri alınıyor... <span class="spinner"></span>';
 
         const headers = { Authorization: `Bearer ${token}` };
@@ -61,11 +66,13 @@
         let playlistsURL = 'https://api.spotify.com/v1/me/playlists?limit=50';
         while (playlistsURL) {
           const res = await fetchWithRetry(playlistsURL, headers);
+          console.log('Çalma listeleri alındı:', res.data.items.length);
           for (const pl of res.data.items) {
             const tracks = [];
             let tracksURL = pl.tracks.href;
             while (tracksURL) {
               const tRes = await fetchWithRetry(tracksURL, headers);
+              console.log(`Çalma listesi "${pl.name}" için ${tRes.data.items.length} şarkı alındı`);
               for (const t of tRes.data.items) {
                 if (t.track) {
                   tracks.push({
@@ -91,6 +98,7 @@
         let likedURL = 'https://api.spotify.com/v1/me/tracks?limit=50';
         while (likedURL) {
           const res = await fetchWithRetry(likedURL, headers);
+          console.log('Beğenilen şarkılar alındı:', res.data.items.length);
           for (const item of res.data.items) {
             if (item.track) {
               likedTracks.push({
@@ -130,14 +138,17 @@
     }
 
     window.addEventListener('load', () => {
+      console.log('Sayfa yüklendi, hash:', window.location.hash);
       if (window.location.hash.includes('access_token')) {
         const hash = window.location.hash.substring(1);
         const params = new URLSearchParams(hash);
         const token = params.get('access_token');
         if (token) {
+          console.log('Token bulundu, veri çekiliyor...');
           fetchSpotifyData(token);
         } else {
           document.getElementById("status").innerText = '❌ Token alınamadı!';
+          console.error('Token alınamadı, hash:', hash);
         }
       }
     });
